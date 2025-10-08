@@ -1,35 +1,132 @@
 """
-User models
+User models for authentication and enrollment.
 """
-from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.utils.translation import gettext_lazy as _
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
+from apps.common.enums import UserRole
+from apps.common.mixins import TimestampMixin
 
 
-class User(AbstractUser):
-    """
-    Custom User model extending AbstractUser
-    """
-    email = models.EmailField(_('email address'), unique=True)
-    phone = models.CharField(_('phone number'), max_length=20, blank=True)
-    avatar = models.ImageField(_('avatar'), upload_to='avatars/', null=True, blank=True)
-    bio = models.TextField(_('biography'), blank=True)
-    date_of_birth = models.DateField(_('date of birth'), null=True, blank=True)
+class UserManager(BaseUserManager):
+    """Custom user manager."""
+
+    def create_user(self, email, password=None, **extra_fields):
+        """Create and return a regular user."""
+        if not email:
+            raise ValueError('Users must have an email address')
+        
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        """Create and return a superuser."""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('role', UserRole.ADMIN)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(email, password, **extra_fields)
+
+
+class User(AbstractBaseUser, PermissionsMixin, TimestampMixin):
+    """Custom user model using email as username."""
     
-    is_verified = models.BooleanField(_('verified'), default=False)
-    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
-    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    email = models.EmailField(unique=True, db_index=True)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    role = models.CharField(
+        max_length=20,
+        choices=UserRole.choices,
+        default=UserRole.STUDENT,
+        db_index=True
+    )
+    
+    objects = UserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    class Meta:
+        db_table = 'users_user'
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
+
+    def __str__(self):
+        return self.email
+
+    @property
+    def is_admin(self):
+        return self.role == UserRole.ADMIN
+
+    @property
+    def is_student(self):
+        return self.role == UserRole.STUDENT
+
+
+class Profile(TimestampMixin):
+    """User profile with additional information."""
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', primary_key=True)
+    display_name = models.CharField(max_length=100, blank=True)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    bio = models.TextField(blank=True)
     
     class Meta:
-        db_table = 'users'
-        verbose_name = _('User')
-        verbose_name_plural = _('Users')
-        ordering = ['-created_at']
-    
+        db_table = 'users_profile'
+        verbose_name = 'Profile'
+        verbose_name_plural = 'Profiles'
+
     def __str__(self):
-        return self.username
-    
+        return f"Profile of {self.user.email}"
+
     @property
-    def full_name(self):
-        """Return the full name of the user"""
-        return f"{self.first_name} {self.last_name}".strip() or self.username
+    def name(self):
+        """Return display name or email."""
+        return self.display_name or self.user.email
+
+
+class Enrollment(TimestampMixin):
+    """User enrollment in books/courses."""
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments')
+    book = models.ForeignKey('catalog.Book', on_delete=models.CASCADE, related_name='enrollments')
+    active_from = models.DateTimeField(default=timezone.now)
+    active_until = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    
+    class Meta:
+        db_table = 'users_enrollment'
+        verbose_name = 'Enrollment'
+        verbose_name_plural = 'Enrollments'
+        unique_together = [['user', 'book']]
+        indexes = [
+            models.Index(fields=['user', 'book']),
+            models.Index(fields=['user', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.book.title}"
+
+    @property
+    def is_expired(self):
+        """Check if enrollment is expired."""
+        if self.active_until is None:
+            return False
+        return timezone.now() > self.active_until
+
+    def save(self, *args, **kwargs):
+        """Override save to check expiration."""
+        if self.is_expired:
+            self.is_active = False
+        super().save(*args, **kwargs)
