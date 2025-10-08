@@ -1,56 +1,98 @@
 """
-User serializers
+Serializers for user authentication and profile.
 """
 from rest_framework import serializers
-from .models import User
+from django.contrib.auth.password_validation import validate_password
+from .models import User, Profile, Enrollment
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    """Serializer for user profile."""
+    
+    name = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = Profile
+        fields = ['display_name', 'name', 'avatar', 'phone', 'date_of_birth', 'bio']
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for User model"""
-    full_name = serializers.ReadOnlyField()
+    """Serializer for user details."""
+    
+    profile = ProfileSerializer(read_only=True)
     
     class Meta:
         model = User
-        fields = [
-            'id', 'username', 'email', 'first_name', 'last_name',
-            'full_name', 'phone', 'avatar', 'bio', 'date_of_birth',
-            'is_verified', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'is_verified', 'created_at', 'updated_at']
+        fields = ['id', 'email', 'role', 'is_active', 'created_at', 'profile']
+        read_only_fields = ['id', 'role', 'is_active', 'created_at']
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating new users"""
-    password = serializers.CharField(write_only=True, min_length=8)
-    password_confirm = serializers.CharField(write_only=True)
+class RegisterSerializer(serializers.ModelSerializer):
+    """Serializer for user registration."""
+    
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password_confirm = serializers.CharField(write_only=True, required=True)
+    display_name = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = User
-        fields = [
-            'username', 'email', 'password', 'password_confirm',
-            'first_name', 'last_name', 'phone'
-        ]
-    
-    def validate(self, data):
-        if data['password'] != data['password_confirm']:
-            raise serializers.ValidationError("Passwords do not match")
-        return data
-    
+        fields = ['email', 'password', 'password_confirm', 'display_name']
+
+    def validate(self, attrs):
+        """Validate password confirmation."""
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password": "Password fields didn't match."})
+        return attrs
+
     def create(self, validated_data):
+        """Create user and profile."""
         validated_data.pop('password_confirm')
-        password = validated_data.pop('password')
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
+        display_name = validated_data.pop('display_name', '')
+        
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            password=validated_data['password']
+        )
+        
+        # Create profile
+        Profile.objects.create(user=user, display_name=display_name)
+        
         return user
 
 
-class UserUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating user profile"""
+class ChangePasswordSerializer(serializers.Serializer):
+    """Serializer for password change."""
+    
+    old_password = serializers.CharField(required=True, write_only=True)
+    new_password = serializers.CharField(required=True, write_only=True, validators=[validate_password])
+    new_password_confirm = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, attrs):
+        """Validate password confirmation."""
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({"new_password": "Password fields didn't match."})
+        return attrs
+
+    def validate_old_password(self, value):
+        """Validate old password."""
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Old password is incorrect.")
+        return value
+
+
+class EnrollmentSerializer(serializers.ModelSerializer):
+    """Serializer for enrollment."""
+    
+    book_title = serializers.CharField(source='book.title', read_only=True)
+    book_slug = serializers.CharField(source='book.slug', read_only=True)
+    is_expired = serializers.ReadOnlyField()
     
     class Meta:
-        model = User
+        model = Enrollment
         fields = [
-            'first_name', 'last_name', 'phone', 'avatar',
-            'bio', 'date_of_birth'
+            'id', 'book', 'book_title', 'book_slug',
+            'active_from', 'active_until', 'is_active', 
+            'is_expired', 'created_at'
         ]
+        read_only_fields = ['id', 'is_active', 'created_at']
