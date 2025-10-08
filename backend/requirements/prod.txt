@@ -1,9 +1,10 @@
-# Production requirements
 -r base.txt
 
 # Production server
-gunicorn>=21.0.0
-whitenoise>=6.5.0
+gunicorn
 
-# Monitoring & Logging
-sentry-sdk>=1.32.0
+# Monitoring & logging
+sentry-sdk
+
+# Security
+django-secure
