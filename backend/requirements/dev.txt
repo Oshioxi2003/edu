@@ -1,17 +1,22 @@
-# Development requirements
 -r base.txt
 
 # Development tools
-django-extensions>=3.2.0
-ipython>=8.0.0
+ipython
+ipdb
 
 # Testing
-pytest>=7.0.0
-pytest-django>=4.5.0
-pytest-cov>=4.0.0
-factory-boy>=3.2.0
+pytest
+pytest-django
+pytest-cov
+factory-boy
 
 # Code quality
-black>=23.0.0
-flake8>=6.0.0
-isort>=5.12.0
+flake8
+black
+isort
+
+# Django debug toolbar
+django-debug-toolbar
+
+# Django extensions
+django-extensions
