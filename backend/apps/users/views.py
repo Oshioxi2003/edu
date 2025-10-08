@@ -1,87 +1,133 @@
 """
-User views
+Views for user authentication and profile.
 """
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework import generics, status, permissions
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.contrib.auth import authenticate
 
-from .models import User
-from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer
-from . import selectors, services
-from apps.common.exceptions import BusinessLogicError
+from .models import User, Profile, Enrollment
+from .serializers import (
+    UserSerializer, RegisterSerializer, ProfileSerializer,
+    ChangePasswordSerializer, EnrollmentSerializer
+)
 
 
-class UserViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for User model
+class RegisterView(generics.CreateAPIView):
+    """User registration endpoint."""
     
-    list: Get all users
-    retrieve: Get user by ID
-    create: Create new user
-    update: Update user
-    partial_update: Partial update user
-    destroy: Delete user
-    """
     queryset = User.objects.all()
-    serializer_class = UserSerializer
-    
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return UserCreateSerializer
-        elif self.action in ['update', 'partial_update']:
-            return UserUpdateSerializer
-        return UserSerializer
-    
-    def get_permissions(self):
-        if self.action == 'create':
-            return [AllowAny()]
-        return [IsAuthenticated()]
-    
-    @action(detail=False, methods=['get'])
-    def me(self, request):
-        """Get current user profile"""
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['put'])
-    def update_profile(self, request):
-        """Update current user profile"""
-        try:
-            user = services.update_user(request.user, request.data)
-            serializer = self.get_serializer(user)
-            return Response(serializer.data)
-        except BusinessLogicError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=False, methods=['post'])
-    def change_password(self, request):
-        """Change user password"""
-        old_password = request.data.get('old_password')
-        new_password = request.data.get('new_password')
+    permission_classes = [permissions.AllowAny]
+    serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        """Create user and return tokens."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
         
-        if not old_password or not new_password:
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'user': UserSerializer(user).data,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }, status=status.HTTP_201_CREATED)
+
+
+class LoginView(TokenObtainPairView):
+    """User login endpoint."""
+    permission_classes = [permissions.AllowAny]
+
+
+class LogoutView(APIView):
+    """User logout endpoint."""
+    
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Blacklist the refresh token."""
+        try:
+            refresh_token = request.data.get("refresh_token")
+            if not refresh_token:
+                return Response(
+                    {"detail": "Refresh token is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            
             return Response(
-                {'error': 'Both old and new passwords are required'},
+                {"detail": "Successfully logged out."},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        try:
-            services.change_password(request.user, old_password, new_password)
-            return Response({'message': 'Password changed successfully'})
-        except BusinessLogicError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProfileView(generics.RetrieveUpdateAPIView):
+    """User profile endpoint."""
     
-    @action(detail=False, methods=['get'])
-    def search(self, request):
-        """Search users"""
-        query = request.query_params.get('q', '')
-        users = selectors.search_users(query)
+    serializer_class = ProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """Get current user's profile."""
+        profile, created = Profile.objects.get_or_create(user=self.request.user)
+        return profile
+
+
+class ChangePasswordView(APIView):
+    """Change password endpoint."""
+    
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Change user password."""
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
         
-        page = self.paginate_queryset(users)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        if serializer.is_valid():
+            # Set new password
+            user = request.user
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+            
+            return Response(
+                {"detail": "Password updated successfully."},
+                status=status.HTTP_200_OK
+            )
         
-        serializer = self.get_serializer(users, many=True)
-        return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MeView(generics.RetrieveAPIView):
+    """Current user details endpoint."""
+    
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        """Return current user."""
+        return self.request.user
+
+
+class MyEnrollmentsView(generics.ListAPIView):
+    """List current user's enrollments."""
+    
+    serializer_class = EnrollmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Return current user's active enrollments."""
+        return Enrollment.objects.filter(
+            user=self.request.user,
+            is_active=True
+        ).select_related('book')
