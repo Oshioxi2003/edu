@@ -1,11 +1,12 @@
 """
-Settings package - Import settings based on environment
+Settings package initialization.
+Load settings based on DJANGO_ENV environment variable.
 """
 import os
 
 env = os.environ.get('DJANGO_ENV', 'dev')
 
-if env == 'prod' or env == 'production':
+if env == 'prod':
     from .prod import *
 else:
     from .dev import *
