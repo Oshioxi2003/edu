@@ -1,0 +1,126 @@
+{% extends "admin/index.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Dashboard styling */
+    .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card.books {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .stat-card.users {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .stat-card.revenue {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+    
+    .stat-card.enrollments {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+    
+    .stat-card h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .stat-card .value {
+        font-size: 32px;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .stat-card .subtext {
+        font-size: 12px;
+        opacity: 0.8;
+        margin-top: 5px;
+    }
+    
+    /* App groups styling */
+    .app-custom-group h2 {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 15px;
+        border-radius: 5px;
+        margin-top: 20px;
+    }
+    
+    /* Welcome message */
+    .welcome-banner {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .welcome-banner h1 {
+        margin: 0 0 10px 0;
+        font-size: 28px;
+    }
+    
+    .welcome-banner p {
+        margin: 0;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="welcome-banner">
+    <h1>👋 Welcome to EduPlatform Admin</h1>
+    <p>Manage your educational content, users, and analytics from this central dashboard.</p>
+</div>
+
+{% if quick_stats %}
+<div class="dashboard-stats">
+    <div class="stat-card books">
+        <h3>📚 Books</h3>
+        <div class="value">{{ quick_stats.published_books }}</div>
+        <div class="subtext">{{ quick_stats.total_books }} total ({{ quick_stats.total_units }} units)</div>
+    </div>
+    
+    <div class="stat-card users">
+        <h3>👥 Active Users</h3>
+        <div class="value">{{ quick_stats.total_users }}</div>
+        <div class="subtext">Registered students</div>
+    </div>
+    
+    <div class="stat-card enrollments">
+        <h3>🎓 Enrollments</h3>
+        <div class="value">{{ quick_stats.active_enrollments }}</div>
+        <div class="subtext">Active learning sessions</div>
+    </div>
+    
+    <div class="stat-card revenue">
+        <h3>💰 Revenue</h3>
+        <div class="value">{{ quick_stats.total_revenue|floatformat:0 }}</div>
+        <div class="subtext">VND ({{ quick_stats.pending_orders }} pending)</div>
+    </div>
+</div>
+{% endif %}
+
+{{ block.super }}
+{% endblock %}
+
