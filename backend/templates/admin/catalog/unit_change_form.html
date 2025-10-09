@@ -1,0 +1,165 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* Enhanced styling for Unit admin */
+    .nested-inline-wrapper {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
+    
+    .validation-warning {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 3px;
+    }
+    
+    .validation-error {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 3px;
+    }
+    
+    .validation-success {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 3px;
+    }
+    
+    /* Quick action buttons */
+    .quick-actions {
+        background: #e7f3ff;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 15px 0;
+    }
+    
+    .quick-actions h3 {
+        margin-top: 0;
+        color: #0066cc;
+    }
+    
+    .quick-action-btn {
+        display: inline-block;
+        padding: 8px 15px;
+        margin: 5px;
+        background: #0066cc;
+        color: white;
+        text-decoration: none;
+        border-radius: 3px;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .quick-action-btn:hover {
+        background: #0052a3;
+        color: white;
+    }
+    
+    /* Choice inline styling */
+    .choice-inline .is_correct input[type="checkbox"]:checked {
+        accent-color: green;
+        transform: scale(1.2);
+    }
+</style>
+
+<script>
+function generateSignedURL(assetId) {
+    fetch(`/admin/catalog/asset/${assetId}/generate-signed-url/`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Signed URL Token (valid for ' + data.expires_in + '):\n\n' + data.token + '\n\nCopied to clipboard!');
+            navigator.clipboard.writeText(data.token);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error generating signed URL: ' + error);
+    });
+}
+
+// Validate questions on form submit
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Get all questions
+            const questions = document.querySelectorAll('.nested-inline-question');
+            let hasErrors = false;
+            
+            questions.forEach(question => {
+                const questionType = question.querySelector('select[name$="type"]');
+                const choices = question.querySelectorAll('input[name$="is_correct"]:checked');
+                
+                if (questionType && questionType.value === 'single' && choices.length !== 1) {
+                    hasErrors = true;
+                    alert('Warning: SINGLE choice questions must have exactly 1 correct answer!');
+                }
+            });
+            
+            // Allow submission but warn user
+            return true;
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+{% if original %}
+<div class="quick-actions">
+    <h3>🚀 Quick Actions</h3>
+    <p>
+        <a href="{% url 'admin:catalog_unit_preview' original.id %}" class="quick-action-btn" target="_blank">
+            👁 Preview as Student
+        </a>
+        <button type="button" class="quick-action-btn" onclick="alert('Audio analysis feature coming soon!')">
+            🔊 Analyze Audio
+        </button>
+        <button type="button" class="quick-action-btn" onclick="alert('Quiz validation feature coming soon!')">
+            ✓ Validate All Questions
+        </button>
+    </p>
+</div>
+
+<div class="validation-info">
+    {% if original.assets.count == 0 %}
+    <div class="validation-warning">
+        <strong>⚠ Warning:</strong> This unit has no assets. Consider uploading audio or other content.
+    </div>
+    {% endif %}
+    
+    {% if original.questions.count == 0 %}
+    <div class="validation-warning">
+        <strong>⚠ Warning:</strong> This unit has no quiz questions. Consider adding questions for better learning.
+    </div>
+    {% endif %}
+    
+    {% if original.assets.exists and original.questions.exists %}
+    <div class="validation-success">
+        <strong>✓ Complete:</strong> This unit has both content and quiz questions.
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
