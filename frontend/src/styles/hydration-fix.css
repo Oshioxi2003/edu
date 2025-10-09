@@ -1,0 +1,75 @@
+/* Hydration mismatch fix - Hide problematic attributes */
+
+/* Hide elements with browser extension attributes during hydration */
+[data-bis-id],
+[data-bis-size],
+[data-bis-skin-checked],
+[bis_skin_checked],
+[bis_register],
+[bis_id],
+[bis_size],
+[cz-shortcut-listen],
+[__processed_0d190e9b-0470-483d-baf1-5c1e1faddbff__] {
+  /* These attributes are added by browser extensions and cause hydration mismatch */
+  /* We'll handle them with JavaScript instead */
+}
+
+/* Ensure smooth transitions during hydration */
+.hydration-boundary {
+  opacity: 0;
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Loading state for hydration */
+.hydration-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f8f9fa;
+}
+
+.hydration-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Loading component styles */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f8f9fa;
+}
+
+.loading-spinner {
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
