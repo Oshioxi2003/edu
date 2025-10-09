@@ -1,0 +1,377 @@
+"""
+Management command to populate demo data.
+"""
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.utils import timezone
+from decimal import Decimal
+import random
+
+from apps.catalog.models import Book, Unit, Asset
+from apps.quiz.models import Question, Choice, Attempt, AttemptAnswer
+from apps.users.models import User, Profile, Enrollment
+from apps.common.enums import QuestionType, AssetType, UserRole
+
+
+class Command(BaseCommand):
+    help = 'Populate database with demo data (10+ each)'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--books',
+            type=int,
+            default=10,
+            help='Number of books to create'
+        )
+        parser.add_argument(
+            '--units-per-book',
+            type=int,
+            default=10,
+            help='Number of units per book'
+        )
+        parser.add_argument(
+            '--questions-per-unit',
+            type=int,
+            default=10,
+            help='Number of questions per unit'
+        )
+        parser.add_argument(
+            '--users',
+            type=int,
+            default=10,
+            help='Number of student users to create'
+        )
+        parser.add_argument(
+            '--clear',
+            action='store_true',
+            help='Clear existing data before populating'
+        )
+
+    def handle(self, *args, **options):
+        num_books = options['books']
+        num_units = options['units_per_book']
+        num_questions = options['questions_per_unit']
+        num_users = options['users']
+        clear_data = options['clear']
+
+        if clear_data:
+            self.stdout.write(self.style.WARNING('Clearing existing data...'))
+            self.clear_data()
+
+        self.stdout.write(self.style.SUCCESS('Starting data population...'))
+        
+        with transaction.atomic():
+            # Create users
+            users = self.create_users(num_users)
+            self.stdout.write(self.style.SUCCESS(f'✓ Created {len(users)} users'))
+
+            # Create books with units, questions, and assets
+            books = self.create_books(num_books, num_units, num_questions)
+            self.stdout.write(self.style.SUCCESS(f'✓ Created {len(books)} books'))
+
+            # Create enrollments
+            enrollments = self.create_enrollments(users, books)
+            self.stdout.write(self.style.SUCCESS(f'✓ Created {len(enrollments)} enrollments'))
+
+            # Create attempts with answers
+            attempts = self.create_attempts(users, books)
+            self.stdout.write(self.style.SUCCESS(f'✓ Created {len(attempts)} quiz attempts'))
+
+        self.stdout.write(self.style.SUCCESS('\n=== SUMMARY ==='))
+        self.stdout.write(f'Users: {User.objects.filter(role=UserRole.STUDENT).count()}')
+        self.stdout.write(f'Books: {Book.objects.count()}')
+        self.stdout.write(f'Units: {Unit.objects.count()}')
+        self.stdout.write(f'Questions: {Question.objects.count()}')
+        self.stdout.write(f'Choices: {Choice.objects.count()}')
+        self.stdout.write(f'Enrollments: {Enrollment.objects.count()}')
+        self.stdout.write(f'Attempts: {Attempt.objects.count()}')
+        self.stdout.write(self.style.SUCCESS('\n✓ Demo data populated successfully!'))
+
+    def clear_data(self):
+        """Clear existing demo data."""
+        AttemptAnswer.objects.all().delete()
+        Attempt.objects.all().delete()
+        Enrollment.objects.all().delete()
+        Choice.objects.all().delete()
+        Question.objects.all().delete()
+        Asset.objects.all().delete()
+        Unit.objects.all().delete()
+        Book.objects.all().delete()
+        Profile.objects.all().delete()
+        User.objects.filter(role=UserRole.STUDENT, email__startswith='student').delete()
+
+    def create_users(self, count):
+        """Create student users."""
+        users = []
+        
+        for i in range(1, count + 1):
+            email = f'student{i}@example.com'
+            
+            # Skip if exists
+            if User.objects.filter(email=email).exists():
+                users.append(User.objects.get(email=email))
+                continue
+            
+            user = User.objects.create_user(
+                email=email,
+                password='password123',
+                role=UserRole.STUDENT,
+                is_active=True
+            )
+            
+            # Create profile
+            Profile.objects.create(
+                user=user,
+                display_name=f'Student {i}',
+                bio=f'This is demo student account #{i}'
+            )
+            
+            users.append(user)
+        
+        return users
+
+    def create_books(self, num_books, num_units, num_questions):
+        """Create books with units, questions, and choices."""
+        books = []
+        
+        # Book topics
+        topics = [
+            'English Grammar Fundamentals',
+            'Advanced English Vocabulary',
+            'Business English Communication',
+            'TOEIC Preparation Course',
+            'IELTS Speaking Practice',
+            'English Pronunciation Mastery',
+            'Writing Skills Development',
+            'Reading Comprehension Strategies',
+            'Listening Skills Enhancement',
+            'English for Academic Purposes',
+            'Conversational English',
+            'English Idioms and Phrases',
+        ]
+        
+        for i in range(1, num_books + 1):
+            topic = topics[i - 1] if i <= len(topics) else f'English Course {i}'
+            
+            book = Book.objects.create(
+                title=topic,
+                slug=f'book-{i}',
+                description=f'Comprehensive course on {topic.lower()}. This course includes {num_units} units covering various aspects of the topic with interactive quizzes.',
+                price=Decimal(random.choice([0, 99000, 199000, 299000, 399000])),
+                is_published=random.choice([True, True, False])  # 2/3 published
+            )
+            
+            # Create units for this book
+            for j in range(1, num_units + 1):
+                unit = Unit.objects.create(
+                    book=book,
+                    title=f'Unit {j}: {self.get_unit_title(j)}',
+                    transcript=self.get_transcript_content(j),
+                    is_free=(j <= 2),  # First 2 units are free
+                    order=j,
+                    duration_sec=random.randint(300, 1800)  # 5-30 minutes
+                )
+                
+                # Create audio asset for unit
+                Asset.objects.create(
+                    unit=unit,
+                    type=AssetType.AUDIO,
+                    file_path=f'/media/audio/book{i}_unit{j}.mp3',
+                    bytes=random.randint(1000000, 5000000),
+                    checksum=f'demo_checksum_{i}_{j}',
+                    is_protected=True
+                )
+                
+                # Create questions for this unit
+                for k in range(1, num_questions + 1):
+                    question_type = random.choice([QuestionType.SINGLE, QuestionType.MULTI])
+                    
+                    question = Question.objects.create(
+                        unit=unit,
+                        type=question_type,
+                        text=self.get_question_text(k, topic),
+                        explanation=f'This is the explanation for question {k}. {self.get_explanation()}',
+                        order=k
+                    )
+                    
+                    # Create choices for this question
+                    num_choices = 4
+                    if question_type == QuestionType.SINGLE:
+                        correct_choice = random.randint(1, num_choices)
+                        for c in range(1, num_choices + 1):
+                            Choice.objects.create(
+                                question=question,
+                                text=self.get_choice_text(c, k),
+                                is_correct=(c == correct_choice),
+                                order=c
+                            )
+                    else:  # MULTI
+                        num_correct = random.randint(1, 2)
+                        correct_choices = random.sample(range(1, num_choices + 1), num_correct)
+                        for c in range(1, num_choices + 1):
+                            Choice.objects.create(
+                                question=question,
+                                text=self.get_choice_text(c, k),
+                                is_correct=(c in correct_choices),
+                                order=c
+                            )
+            
+            books.append(book)
+        
+        return books
+
+    def create_enrollments(self, users, books):
+        """Create enrollments for users in books."""
+        enrollments = []
+        
+        for user in users:
+            # Each user enrolls in 3-7 random books
+            num_enrollments = random.randint(3, min(7, len(books)))
+            enrolled_books = random.sample(books, num_enrollments)
+            
+            for book in enrolled_books:
+                enrollment = Enrollment.objects.create(
+                    user=user,
+                    book=book,
+                    is_active=True
+                )
+                enrollments.append(enrollment)
+        
+        return enrollments
+
+    def create_attempts(self, users, books):
+        """Create quiz attempts for enrolled users."""
+        attempts = []
+        
+        for user in users:
+            # Get user's enrolled books
+            enrolled_books = Book.objects.filter(enrollments__user=user)
+            
+            for book in enrolled_books:
+                # Attempt quizzes for some units (randomly)
+                units = list(book.units.all())
+                num_attempts = random.randint(1, min(5, len(units)))
+                attempted_units = random.sample(units, num_attempts)
+                
+                for unit in attempted_units:
+                    questions = list(unit.questions.all())
+                    if not questions:
+                        continue
+                    
+                    # Create attempt
+                    attempt = Attempt.objects.create(
+                        user=user,
+                        unit=unit,
+                        started_at=timezone.now(),
+                        submitted_at=timezone.now()
+                    )
+                    
+                    # Answer questions
+                    correct_count = 0
+                    for question in questions:
+                        choices = list(question.choices.all())
+                        correct_choices = [c.id for c in choices if c.is_correct]
+                        
+                        # Simulate answer (70% chance of correct)
+                        if random.random() < 0.7:
+                            selected = correct_choices
+                            is_correct = True
+                            correct_count += 1
+                        else:
+                            # Wrong answer
+                            if question.type == QuestionType.SINGLE:
+                                selected = [random.choice([c.id for c in choices if not c.is_correct] or [choices[0].id])]
+                            else:
+                                selected = random.sample([c.id for c in choices], random.randint(1, len(choices)))
+                            is_correct = False
+                        
+                        AttemptAnswer.objects.create(
+                            attempt=attempt,
+                            question=question,
+                            selected_choices=selected,
+                            is_correct=is_correct
+                        )
+                    
+                    # Update score
+                    total_questions = len(questions)
+                    attempt.score_raw = correct_count
+                    attempt.score_pct = (correct_count / total_questions * 100) if total_questions > 0 else 0
+                    attempt.save()
+                    
+                    attempts.append(attempt)
+        
+        return attempts
+
+    def get_unit_title(self, number):
+        """Generate unit title."""
+        titles = [
+            'Introduction and Basic Concepts',
+            'Core Fundamentals',
+            'Practical Applications',
+            'Advanced Techniques',
+            'Common Mistakes to Avoid',
+            'Real-world Examples',
+            'Practice and Exercises',
+            'Review and Assessment',
+            'Special Topics',
+            'Final Project',
+            'Additional Resources',
+            'Expert Tips',
+        ]
+        return titles[number - 1] if number <= len(titles) else f'Topic {number}'
+
+    def get_transcript_content(self, number):
+        """Generate transcript content."""
+        return f"""# Lesson {number} Transcript
+
+## Introduction
+Welcome to this lesson. In this unit, we will explore important concepts and practice key skills.
+
+## Main Content
+Here we dive deep into the topic, providing detailed explanations and examples.
+
+### Key Points
+- Important concept 1
+- Important concept 2
+- Important concept 3
+
+## Practice
+Now let's practice what we've learned with some exercises.
+
+## Summary
+In this lesson, we covered the essential concepts and practiced applying them.
+"""
+
+    def get_question_text(self, number, topic):
+        """Generate question text."""
+        questions = [
+            f'What is the main purpose of {topic.lower()}?',
+            f'Which of the following is correct regarding {topic.split()[0]}?',
+            f'How would you apply this concept in real-world scenarios?',
+            f'What are the key characteristics of this topic?',
+            f'Which statement best describes the fundamental principle?',
+            f'What should you avoid when practicing {topic.split()[0]}?',
+            f'How can you improve your understanding of this concept?',
+            f'What is the most effective strategy for mastering this?',
+            f'Which example best illustrates the concept?',
+            f'What are the common mistakes beginners make?',
+        ]
+        return questions[number - 1] if number <= len(questions) else f'Question {number} about {topic}'
+
+    def get_choice_text(self, number, question_num):
+        """Generate choice text."""
+        prefixes = ['Option', 'Answer', 'Choice', 'Alternative']
+        prefix = prefixes[(question_num - 1) % len(prefixes)]
+        return f'{prefix} {number}: This is a possible answer to the question.'
+
+    def get_explanation(self):
+        """Generate explanation text."""
+        explanations = [
+            'The correct answer is based on the fundamental principles we discussed.',
+            'This concept is important because it forms the foundation of understanding.',
+            'Remember to apply this principle in practical situations.',
+            'This is a key concept that you should master.',
+            'Understanding this will help you in more advanced topics.',
+        ]
+        return random.choice(explanations)
+
