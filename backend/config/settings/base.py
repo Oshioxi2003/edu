@@ -33,6 +33,11 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_spectacular',
     
+    # Admin enhancements
+    'nested_admin',
+    'adminsortable2',
+    'import_export',
+    
     # Local apps
     'apps.common',
     'apps.users',
