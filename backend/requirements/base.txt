@@ -17,6 +17,7 @@ celery
 
 # File handling
 Pillow
+mutagen  # For audio metadata extraction
 
 # API Documentation
 drf-spectacular
@@ -27,5 +28,11 @@ python-decouple
 # HTTP requests (for payment gateways)
 requests
 
+# Admin enhancements
+django-nested-admin  # Nested inline editing
+django-admin-sortable2  # Drag & drop ordering
+django-import-export  # Data import/export
+
 # Utilities
 python-dateutil
+itsdangerous  # For generating signed URLs
