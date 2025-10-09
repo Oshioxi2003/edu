@@ -1,5 +1,15 @@
-@import "node_modules/react-modal-video/scss/modal-video.scss";
-@import "slick-carousel/slick/slick.css"; 
-@import "~bootstrap/scss/bootstrap";
-@import "swiper/css/bundle"; 
-@import "../../public/assets/scss/main.scss";
+/* Base styles - now using Tailwind CSS */
+/* Legacy SCSS imports removed in favor of Tailwind */
+
+/* You can add any custom global SCSS here if needed */
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
