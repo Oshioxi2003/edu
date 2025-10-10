@@ -1,1 +1,0 @@
-export { default as ScrollTrigger } from "./gsap-scroll-trigger";
