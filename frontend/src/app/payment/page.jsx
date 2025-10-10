@@ -29,21 +29,34 @@ export default function PaymentPage() {
   }, [isAuthenticated, router]);
 
   const createOrderMutation = useMutation({
-    mutationFn: async (method) => {
-      const response = await paymentAPI.createOrder(courseId, method);
-      return response.data;
+    mutationFn: async ({ bookId, provider }) => {
+      // Step 1: Create order
+      const orderResponse = await paymentAPI.createOrder(bookId, provider);
+      const order = orderResponse.data;
+      
+      // Step 2: Create checkout URL
+      let checkoutResponse;
+      if (provider === 'vnpay') {
+        checkoutResponse = await paymentAPI.createVNPayCheckout(order.id);
+        return { paymentUrl: checkoutResponse.data.payment_url };
+      } else if (provider === 'momo') {
+        checkoutResponse = await paymentAPI.createMoMoCheckout(order.id);
+        return { paymentUrl: checkoutResponse.data.pay_url };
+      }
+      
+      return order;
     },
     onSuccess: (data) => {
-      if (data.redirect_url) {
+      if (data.paymentUrl) {
         // Redirect to payment gateway
-        window.location.href = data.redirect_url;
+        window.location.href = data.paymentUrl;
       } else {
         toast.success('Đơn hàng đã được tạo');
-        router.push(`/payment/result?order_id=${data.order_id}`);
       }
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Có lỗi xảy ra khi tạo đơn hàng');
+      const errorMessage = error.response?.data?.detail || 'Có lỗi xảy ra khi tạo đơn hàng';
+      toast.error(errorMessage);
     },
   });
 
@@ -52,7 +65,11 @@ export default function PaymentPage() {
       toast.error('Vui lòng chọn phương thức thanh toán');
       return;
     }
-    createOrderMutation.mutate(paymentMethod);
+    if (!course?.id) {
+      toast.error('Không tìm thấy thông tin khóa học');
+      return;
+    }
+    createOrderMutation.mutate({ bookId: course.id, provider: paymentMethod });
   };
 
   if (!course) {
@@ -78,11 +95,11 @@ export default function PaymentPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-bold text-gray-900">{course.title}</h3>
-                    <p className="text-sm text-gray-600">{course.total_units} Units</p>
+                    <p className="text-sm text-gray-600">{course.unit_count || 0} Units</p>
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-primary">
-                      {course.price?.toLocaleString('vi-VN')}đ
+                      {parseFloat(course.price || 0).toLocaleString('vi-VN')}đ
                     </div>
                   </div>
                 </div>
@@ -177,7 +194,7 @@ export default function PaymentPage() {
                 <div className="space-y-3 mb-6 pb-6 border-b border-gray-200">
                   <div className="flex justify-between text-gray-700">
                     <span>Giá khóa học</span>
-                    <span>{course.price?.toLocaleString('vi-VN')}đ</span>
+                    <span>{parseFloat(course.price || 0).toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div className="flex justify-between text-gray-700">
                     <span>Giảm giá</span>
@@ -191,7 +208,7 @@ export default function PaymentPage() {
 
                 <div className="flex justify-between text-lg font-bold text-gray-900 mb-6">
                   <span>Tổng cộng</span>
-                  <span className="text-primary">{course.price?.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-primary">{parseFloat(course.price || 0).toLocaleString('vi-VN')}đ</span>
                 </div>
 
                 <Button

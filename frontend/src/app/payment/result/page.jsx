@@ -1,74 +1,61 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { paymentAPI } from '@/lib/api';
 import { Button, Skeleton } from '@/components/ui';
 import Link from 'next/link';
+import MainLayout from '@/components/layout/MainLayout';
 
 export default function PaymentResultPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('order_id');
-  const [isVerifying, setIsVerifying] = useState(true);
-
-  // Get all query params for verification
-  const queryParams = {};
-  searchParams.forEach((value, key) => {
-    queryParams[key] = value;
-  });
-
-  // Verify payment
-  const verifyMutation = useMutation({
-    mutationFn: async () => {
-      const response = await paymentAPI.verifyPayment(queryParams);
-      return response.data;
-    },
-    onSuccess: () => {
-      setIsVerifying(false);
-    },
-    onError: () => {
-      setIsVerifying(false);
-    },
-  });
-
-  useEffect(() => {
-    if (Object.keys(queryParams).length > 1) {
-      verifyMutation.mutate();
-    } else {
-      setIsVerifying(false);
-    }
-  }, []);
-
-  // Get order status
-  const { data: order, isLoading } = useQuery({
-    queryKey: ['order', orderId],
+  
+  // VNPay/MoMo may send different param names
+  const orderId = searchParams.get('order_id') || searchParams.get('orderId');
+  const vnpayResponseCode = searchParams.get('vnp_ResponseCode');
+  const momoResultCode = searchParams.get('resultCode');
+  
+  // Get order details
+  const { data: ordersResponse, isLoading } = useQuery({
+    queryKey: ['orders', orderId],
     queryFn: async () => {
-      const response = await paymentAPI.checkOrderStatus(orderId);
+      const response = await paymentAPI.getOrders({});
       return response.data;
     },
-    enabled: !!orderId && !isVerifying,
+    enabled: !!orderId,
+    refetchInterval: (data) => {
+      // Keep refetching if order is still pending
+      const orders = data?.results || [];
+      const order = orders[0];
+      return order?.status === 'pending' ? 3000 : false;
+    },
   });
 
-  if (isLoading || isVerifying) {
+  // Find the order from the list (latest order or matching ID)
+  const order = ordersResponse?.results?.[0];
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full px-4">
-          <div className="bg-white rounded-xl shadow-card p-8 text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-gray-600">Đang xác minh thanh toán...</p>
+      <MainLayout>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="max-w-md w-full px-4">
+            <div className="bg-white rounded-xl shadow-card p-8 text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-gray-600">Đang kiểm tra thanh toán...</p>
+            </div>
           </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
-  const isSuccess = order?.status === 'completed';
+  const isSuccess = order?.status === 'paid';
   const isPending = order?.status === 'pending';
   const isFailed = order?.status === 'failed' || order?.status === 'cancelled';
 
   return (
+    <MainLayout>
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12">
       <div className="max-w-md w-full px-4">
         <div className="bg-white rounded-xl shadow-card p-8">
@@ -88,26 +75,26 @@ export default function PaymentResultPage() {
               <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Mã đơn hàng:</span>
-                  <span className="font-semibold text-gray-900">{order.order_id}</span>
+                  <span className="font-semibold text-gray-900">{order.order_code}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Khóa học:</span>
-                  <span className="font-semibold text-gray-900">{order.book_title}</span>
+                  <span className="font-semibold text-gray-900">{order.book?.title}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Số tiền:</span>
-                  <span className="font-semibold text-primary">{order.amount?.toLocaleString('vi-VN')}đ</span>
+                  <span className="font-semibold text-primary">{parseFloat(order.amount || 0).toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Phương thức:</span>
                   <span className="font-semibold text-gray-900">
-                    {order.payment_method === 'vnpay' ? 'VNPay' : 'Momo'}
+                    {order.provider === 'vnpay' ? 'VNPay' : 'MoMo'}
                   </span>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <Link href={`/course/${order.book_id}`} className="block">
+                <Link href={`/course/${order.book?.slug || order.book?.id}`} className="block">
                   <Button variant="primary" className="w-full">
                     Bắt đầu học ngay 🚀
                   </Button>
@@ -159,7 +146,7 @@ export default function PaymentResultPage() {
               )}
 
               <div className="space-y-3">
-                <Link href={`/payment?course=${order?.book_id}`} className="block">
+                <Link href={`/payment?course=${order?.book?.slug || order?.book?.id}`} className="block">
                   <Button variant="primary" className="w-full">
                     Thử lại
                   </Button>
@@ -189,6 +176,7 @@ export default function PaymentResultPage() {
         </div>
       </div>
     </div>
+    </MainLayout>
   );
 }
 

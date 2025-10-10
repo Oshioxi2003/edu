@@ -43,8 +43,10 @@ export default function CourseDetailPage({ params }) {
     );
   }
 
-  const isPurchased = course?.is_purchased || course?.is_free;
+  // Backend uses `is_owned` field
+  const isPurchased = course?.is_owned;
   const overallProgress = course?.progress_pct || 0;
+  const isFree = course?.price === "0.00" || course?.price === 0;
 
   return (
     <MainLayout>
@@ -79,7 +81,7 @@ export default function CourseDetailPage({ params }) {
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
-                  <span>{course?.total_units || 0} Units</span>
+                  <span>{course?.unit_count || 0} Units</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -102,11 +104,11 @@ export default function CourseDetailPage({ params }) {
                 <div className="bg-white rounded-xl p-6 shadow-xl">
                   <div className="text-center mb-6">
                     <div className="text-4xl font-bold text-primary mb-2">
-                      {course?.is_free ? 'Miễn phí' : `${course?.price?.toLocaleString('vi-VN')}đ`}
+                      {isFree ? 'Miễn phí' : `${parseFloat(course?.price || 0).toLocaleString('vi-VN')}đ`}
                     </div>
-                    {!course?.is_free && (
+                    {!isFree && (
                       <div className="text-sm text-gray-500 line-through">
-                        {(course?.price * 1.5)?.toLocaleString('vi-VN')}đ
+                        {(parseFloat(course?.price || 0) * 1.5).toLocaleString('vi-VN')}đ
                       </div>
                     )}
                   </div>
@@ -116,7 +118,7 @@ export default function CourseDetailPage({ params }) {
                     className="w-full mb-4"
                     onClick={handlePurchase}
                   >
-                    {course?.is_free ? 'Bắt đầu học ngay' : 'Mua khóa học'}
+                    {isFree ? 'Bắt đầu học ngay' : 'Mua khóa học'}
                   </Button>
 
                   <div className="space-y-3 text-sm text-gray-700">
@@ -171,23 +173,23 @@ export default function CourseDetailPage({ params }) {
       {/* Units List */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Danh sách Units ({units?.length || 0})
+          Danh sách Units ({course?.units?.length || units?.length || 0})
         </h2>
 
-        {unitsLoading ? (
+        {unitsLoading || courseLoading ? (
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
               <Skeleton key={i} className="h-32" />
             ))}
           </div>
-        ) : units?.length > 0 ? (
+        ) : (course?.units || units)?.length > 0 ? (
           <div className="space-y-4">
-            {units.map((unit) => (
+            {(course?.units || units).map((unit) => (
               <UnitCard
                 key={unit.id}
                 unit={unit}
                 courseId={courseId}
-                isLocked={!isPurchased}
+                isLocked={!isPurchased && !unit.is_free}
                 progress={unit.progress}
               />
             ))}
