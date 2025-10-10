@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardBody, Button, Badge, ProgressBar } from '@/components/ui';
 import { useTranslation } from '@/hooks/useTranslation';
 import Link from 'next/link';
@@ -7,27 +8,36 @@ import Image from 'next/image';
 
 export default function CourseCard({ course, userProgress }) {
   const { t } = useTranslation();
+  const [isClient, setIsClient] = useState(false);
+  
   const {
     id,
+    slug,
     title,
     description,
-    thumbnail,
+    cover,
     level,
-    total_units,
+    unit_count,
     price,
-    is_free,
+    is_owned,
   } = course;
 
-  const progress = userProgress?.progress_pct || 0;
-  const isPurchased = userProgress?.is_purchased || is_free;
+  const progress = userProgress?.completion_percentage || 0;
+  const isPurchased = is_owned;
+  const isFree = price === "0.00" || price === 0;
+
+  // Fix hydration by only showing user-specific content after mount
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   return (
-    <Card className="overflow-hidden h-full flex flex-col">
-      {/* Thumbnail */}
-      <div className="relative h-48 bg-gradient-to-br from-primary-100 to-accent-100 dark:from-primary-900 dark:to-accent-900">
-        {thumbnail ? (
+    <Card className="overflow-hidden h-full flex flex-col" suppressHydrationWarning>
+      {/* Cover Image */}
+      <div className="relative h-48 bg-gradient-to-br from-primary-100 to-accent-100 dark:from-primary-900 dark:to-accent-900" suppressHydrationWarning>
+        {cover ? (
           <Image
-            src={thumbnail}
+            src={cover}
             alt={title}
             fill
             className="object-cover"
@@ -45,11 +55,11 @@ export default function CourseCard({ course, userProgress }) {
           </Badge>
         </div>
 
-        {/* Price Tag */}
-        {!isPurchased && (
-          <div className="absolute top-3 right-3 bg-white dark:bg-gray-800 rounded-lg px-3 py-1 shadow-md">
+        {/* Price Tag - Always show (static data) */}
+        {!is_owned && (
+          <div className="absolute top-3 right-3 bg-white dark:bg-gray-800 rounded-lg px-3 py-1 shadow-md" suppressHydrationWarning>
             <span className="font-bold text-primary dark:text-primary-400">
-              {is_free ? t('courses.status.free') : `${price?.toLocaleString('vi-VN')}đ`}
+              {isFree ? t('courses.status.free') : `${parseFloat(price || 0).toLocaleString('vi-VN')}đ`}
             </span>
           </div>
         )}
@@ -68,7 +78,7 @@ export default function CourseCard({ course, userProgress }) {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            <span>{total_units} {t('courses.units')}</span>
+            <span>{unit_count || 0} {t('courses.units')}</span>
           </div>
           <div className="flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -78,20 +88,28 @@ export default function CourseCard({ course, userProgress }) {
           </div>
         </div>
 
-        {/* Progress (if purchased) */}
-        {isPurchased && (
+        {/* Progress (if purchased) - Only show after hydration */}
+        {isClient && isPurchased && progress > 0 && (
           <div className="mb-4">
             <ProgressBar progress={progress} size="sm" />
           </div>
         )}
 
         {/* CTA Button */}
-        <Link href={`/course/${id}`} className="block">
+        <Link href={`/course/${slug || id}`} className="block" suppressHydrationWarning>
           <Button 
-            variant={isPurchased ? 'primary' : 'accent'} 
+            variant="primary"
             className="w-full"
+            suppressHydrationWarning
           >
-            {isPurchased ? t('courses.continue') : is_free ? t('courses.startNow') : t('courses.viewDetails')}
+            {!isClient 
+              ? t('courses.viewDetails')
+              : isPurchased 
+                ? t('courses.continue') 
+                : isFree 
+                  ? t('courses.startNow') 
+                  : t('courses.viewDetails')
+            }
           </Button>
         </Link>
       </CardBody>

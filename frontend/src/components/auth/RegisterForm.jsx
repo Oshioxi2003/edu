@@ -19,8 +19,7 @@ export default function RegisterForm() {
   });
 
   const onSubmit = (data) => {
-    const { password_confirm, ...registerData } = data;
-    registerUser(registerData);
+    registerUser(data);
   };
 
   return (
@@ -30,8 +29,8 @@ export default function RegisterForm() {
           label="Họ và tên"
           type="text"
           placeholder="Nguyễn Văn A"
-          error={errors.full_name?.message}
-          {...register('full_name')}
+          error={errors.display_name?.message}
+          {...register('display_name')}
         />
       </div>
 
@@ -51,7 +50,7 @@ export default function RegisterForm() {
           type="password"
           placeholder="••••••••"
           error={errors.password?.message}
-          helperText="Tối thiểu 6 ký tự"
+          helperText="Tối thiểu 8 ký tự"
           {...register('password')}
         />
       </div>

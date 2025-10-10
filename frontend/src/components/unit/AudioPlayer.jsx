@@ -50,12 +50,16 @@ export default function AudioPlayer({ audioUrl, onTimeUpdate, onEnded, savedPosi
         }}
         options={plyrOptions}
         onTimeUpdate={(event) => {
-          if (onTimeUpdate) {
-            const time = event.detail.plyr.currentTime;
+          if (onTimeUpdate && plyrRef.current?.plyr) {
+            const time = plyrRef.current.plyr.currentTime;
             onTimeUpdate(time);
           }
         }}
-        onEnded={onEnded}
+        onEnded={() => {
+          if (onEnded) {
+            onEnded();
+          }
+        }}
       />
     </div>
   );
