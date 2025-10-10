@@ -40,7 +40,7 @@ class OrderAdmin(admin.ModelAdmin):
     """Enhanced admin for Order model."""
     
     list_display = [
-        'id',
+        'order_code',
         'user',
         'book',
         'amount_display',
@@ -50,11 +50,13 @@ class OrderAdmin(admin.ModelAdmin):
         'created_at'
     ]
     list_filter = ['status', 'provider', 'created_at', 'currency']
-    search_fields = ['id', 'user__email', 'book__title']
+    search_fields = ['order_code', 'id', 'user__email', 'book__title']
     autocomplete_fields = ['user', 'book']
     readonly_fields = [
+        'order_code',
         'amount',
         'currency',
+        'paid_at',
         'created_at',
         'updated_at',
         'order_details',
@@ -63,10 +65,10 @@ class OrderAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Order Info', {
-            'fields': ('user', 'book')
+            'fields': ('order_code', 'user', 'book')
         }),
         ('Payment Details', {
-            'fields': ('amount', 'currency', 'provider', 'status')
+            'fields': ('amount', 'currency', 'provider', 'status', 'paid_at')
         }),
         ('Details', {
             'fields': ('order_details', 'payment_timeline'),
@@ -172,12 +174,15 @@ class OrderAdmin(admin.ModelAdmin):
             return '-'
         
         html = '<div style="padding: 10px; background: #f5f5f5; border-radius: 5px;">'
+        html += f'<p><strong>Order Code:</strong> {obj.order_code}</p>'
         html += f'<p><strong>Order ID:</strong> #{obj.id}</p>'
         html += f'<p><strong>User:</strong> {obj.user.email}</p>'
         html += f'<p><strong>Book:</strong> {obj.book.title}</p>'
         html += f'<p><strong>Amount:</strong> {obj.amount:,.0f} {obj.currency}</p>'
         html += f'<p><strong>Provider:</strong> {obj.get_provider_display()}</p>'
         html += f'<p><strong>Status:</strong> {obj.get_status_display()}</p>'
+        if obj.paid_at:
+            html += f'<p><strong>Paid At:</strong> {obj.paid_at.strftime("%Y-%m-%d %H:%M:%S")}</p>'
         
         # Check enrollment
         enrollment = Enrollment.objects.filter(user=obj.user, book=obj.book).first()
@@ -235,6 +240,7 @@ class OrderAdmin(admin.ModelAdmin):
             if order.status == OrderStatus.PENDING:
                 # Update order status
                 order.status = OrderStatus.PAID
+                order.paid_at = timezone.now()
                 order.save()
                 updated += 1
                 

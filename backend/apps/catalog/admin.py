@@ -19,7 +19,7 @@ from apps.common.utils.security import generate_audio_signed_url, extract_audio_
 # INLINE ADMINS
 # ============================================================================
 
-class ChoiceNestedInline(SortableInlineAdminMixin, nested_admin.NestedTabularInline):
+class ChoiceNestedInline(nested_admin.NestedTabularInline):
     """Nested inline for Choices within Questions."""
     model = Choice
     extra = 4
@@ -35,7 +35,7 @@ class ChoiceNestedInline(SortableInlineAdminMixin, nested_admin.NestedTabularInl
     correct_icon.short_description = ''
 
 
-class QuestionNestedInline(SortableInlineAdminMixin, nested_admin.NestedTabularInline):
+class QuestionNestedInline(nested_admin.NestedTabularInline):
     """Nested inline for Questions within Units."""
     model = Question
     extra = 0
@@ -76,7 +76,7 @@ class QuestionNestedInline(SortableInlineAdminMixin, nested_admin.NestedTabularI
     validation_status.short_description = 'Validation'
 
 
-class AssetInline(admin.TabularInline):
+class AssetInline(nested_admin.NestedTabularInline):
     """Inline admin for assets."""
     model = Asset
     extra = 0
@@ -228,7 +228,8 @@ class BookAdmin(SortableAdminBase, admin.ModelAdmin):
     def price_display(self, obj):
         """Display price with currency."""
         if obj.price > 0:
-            return format_html('<strong>{:,.0f} VND</strong>', obj.price)
+            formatted_price = f'{float(obj.price):,.0f}'
+            return format_html('<strong>{} VND</strong>', formatted_price)
         return format_html('<span style="color: green;">Free</span>')
     price_display.short_description = 'Price'
     price_display.admin_order_field = 'price'

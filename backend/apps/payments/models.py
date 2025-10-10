@@ -19,6 +19,7 @@ class Order(TimestampMixin):
     
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='orders')
     book = models.ForeignKey('catalog.Book', on_delete=models.CASCADE, related_name='orders')
+    order_code = models.CharField(max_length=50, unique=True, db_index=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=3, default='VND')
     status = models.CharField(
@@ -32,6 +33,7 @@ class Order(TimestampMixin):
         choices=PaymentProvider.choices,
         db_index=True
     )
+    paid_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'payments_order'
@@ -45,7 +47,30 @@ class Order(TimestampMixin):
         ]
 
     def __str__(self):
-        return f"Order #{self.id} - {self.user.email} - {self.book.title} - {self.get_status_display()}"
+        return f"{self.order_code} - {self.user.email} - {self.book.title} - {self.get_status_display()}"
+    
+    def save(self, *args, **kwargs):
+        """Generate order_code if not exists."""
+        if not self.order_code:
+            import datetime
+            timestamp = datetime.datetime.now().strftime('%Y%m%d')
+            # Get last order of the day
+            last_order = Order.objects.filter(
+                order_code__startswith=f'ORD-{timestamp}'
+            ).order_by('-order_code').first()
+            
+            if last_order:
+                try:
+                    last_number = int(last_order.order_code.split('-')[-1])
+                    new_number = last_number + 1
+                except (ValueError, IndexError):
+                    new_number = 1
+            else:
+                new_number = 1
+            
+            self.order_code = f'ORD-{timestamp}-{new_number:04d}'
+        
+        super().save(*args, **kwargs)
 
     @property
     def is_paid(self):

@@ -112,7 +112,8 @@ class OrderService:
         
         # Payment successful - update order
         order.status = OrderStatus.PAID
-        order.save(update_fields=['status'])
+        order.paid_at = timezone.now()
+        order.save(update_fields=['status', 'paid_at'])
         
         # Create enrollment
         Enrollment.objects.get_or_create(

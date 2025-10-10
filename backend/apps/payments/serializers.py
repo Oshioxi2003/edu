@@ -16,11 +16,11 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'book', 'book_title', 'book_slug',
+            'id', 'order_code', 'book', 'book_title', 'book_slug',
             'amount', 'currency', 'status', 'provider',
-            'is_paid', 'is_pending', 'created_at'
+            'is_paid', 'is_pending', 'created_at', 'paid_at'
         ]
-        read_only_fields = ['id', 'amount', 'status', 'created_at']
+        read_only_fields = ['id', 'order_code', 'amount', 'status', 'created_at', 'paid_at']
 
 
 class CreateOrderSerializer(serializers.Serializer):

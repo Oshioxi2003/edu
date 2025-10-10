@@ -25,6 +25,14 @@ if os.environ.get('USE_SQLITE', 'False') == 'True':
 # Email backend for development
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+# Use local memory cache instead of Redis in development
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
 # Disable throttling in development
 REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
     'anon': '1000/hour',
