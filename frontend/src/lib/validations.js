@@ -7,7 +7,7 @@ export const loginSchema = yup.object().shape({
     .required('Email là bắt buộc'),
   password: yup
     .string()
-    .min(6, 'Mật khẩu phải có ít nhất 6 ký tự')
+    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
     .required('Mật khẩu là bắt buộc'),
 });
 
@@ -16,13 +16,13 @@ export const registerSchema = yup.object().shape({
     .string()
     .email('Email không hợp lệ')
     .required('Email là bắt buộc'),
-  full_name: yup
+  display_name: yup
     .string()
     .min(2, 'Họ tên phải có ít nhất 2 ký tự')
     .required('Họ tên là bắt buộc'),
   password: yup
     .string()
-    .min(6, 'Mật khẩu phải có ít nhất 6 ký tự')
+    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
     .required('Mật khẩu là bắt buộc'),
   password_confirm: yup
     .string()

@@ -3,13 +3,33 @@ import { persist } from 'zustand/middleware';
 
 export const useAuthStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
+      accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
       
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setAuth: (user, accessToken, refreshToken) => set({ 
+        user, 
+        accessToken, 
+        refreshToken,
+        isAuthenticated: true 
+      }),
       
-      logout: () => set({ user: null, isAuthenticated: false }),
+      setUser: (user) => set({ user }),
+      
+      setAccessToken: (accessToken) => set({ accessToken }),
+      
+      getAccessToken: () => get().accessToken,
+      
+      getRefreshToken: () => get().refreshToken,
+      
+      logout: () => set({ 
+        user: null, 
+        accessToken: null,
+        refreshToken: null,
+        isAuthenticated: false 
+      }),
       
       updateUser: (updates) => set((state) => ({
         user: state.user ? { ...state.user, ...updates } : null,
@@ -19,6 +39,8 @@ export const useAuthStore = create(
       name: 'auth-storage',
       partialize: (state) => ({
         user: state.user,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

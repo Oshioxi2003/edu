@@ -2,46 +2,71 @@ import axios from './axios';
 
 // Auth APIs
 export const authAPI = {
-  login: (credentials) => axios.post('/users/login/', credentials),
-  register: (userData) => axios.post('/users/register/', userData),
-  logout: () => axios.post('/users/logout/'),
-  getCurrentUser: () => axios.get('/users/me/'),
-  updateProfile: (data) => axios.patch('/users/me/', data),
-  changePassword: (data) => axios.post('/users/change-password/', data),
+  login: (credentials) => axios.post('/auth/login/', credentials),
+  register: (userData) => axios.post('/auth/register/', userData),
+  logout: (refreshToken) => axios.post('/auth/logout/', { refresh_token: refreshToken }),
+  refresh: (refreshToken) => axios.post('/auth/refresh/', { refresh: refreshToken }),
+  getCurrentUser: () => axios.get('/auth/me/'),
+  getProfile: () => axios.get('/auth/profile/'),
+  updateProfile: (data) => axios.put('/auth/profile/', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  patchProfile: (data) => axios.patch('/auth/profile/', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  changePassword: (data) => axios.post('/auth/change-password/', data),
+  getEnrollments: () => axios.get('/auth/enrollments/'),
 };
 
 // Catalog APIs
 export const catalogAPI = {
+  // Books
   getBooks: (params) => axios.get('/catalog/books/', { params }),
-  getBook: (id) => axios.get(`/catalog/books/${id}/`),
-  getUnits: (bookId) => axios.get(`/catalog/books/${bookId}/units/`),
-  getUnit: (bookId, unitId) => axios.get(`/catalog/books/${bookId}/units/${unitId}/`),
+  getBook: (slug) => axios.get(`/catalog/books/${slug}/`),
+  getBookUnits: (slug) => axios.get(`/catalog/books/${slug}/units/`),
+  
+  // Units
+  getUnit: (unitId) => axios.get(`/catalog/units/${unitId}/`),
+  getUnitAssetUrl: (unitId, assetType) => axios.post(`/catalog/units/${unitId}/asset_url/`, {
+    asset_type: assetType
+  }),
 };
 
 // Progress APIs
 export const progressAPI = {
-  getUserProgress: () => axios.get('/progress/'),
-  getBookProgress: (bookId) => axios.get(`/progress/books/${bookId}/`),
-  updateUnitProgress: (unitId, data) => axios.post(`/progress/units/${unitId}/`, data),
+  getProgress: () => axios.get('/progress/'),
+  getAnalytics: () => axios.get('/progress/analytics/'),
+  createSession: (unitId, data) => axios.post(`/progress/sessions/units/${unitId}/tick/`, data),
 };
 
 // Quiz APIs
 export const quizAPI = {
   getQuestions: (unitId) => axios.get(`/quiz/units/${unitId}/questions/`),
-  submitAnswers: (unitId, data) => axios.post(`/quiz/units/${unitId}/submit/`, data),
-  getResults: (submissionId) => axios.get(`/quiz/results/${submissionId}/`),
-  getUnitResults: (unitId) => axios.get(`/quiz/units/${unitId}/results/`),
+  submitQuiz: (unitId, data) => axios.post(`/quiz/units/${unitId}/submit/`, data),
+  getAttempts: (params) => axios.get('/quiz/attempts/', { params }),
+  getAttempt: (attemptId) => axios.get(`/quiz/attempts/${attemptId}/`),
+  getBestAttempt: (unitId) => axios.get(`/quiz/attempts/units/${unitId}/best/`),
 };
 
 // Payment APIs
 export const paymentAPI = {
-  createOrder: (bookId, method) => axios.post('/payments/orders/', { 
+  // Orders
+  createOrder: (bookId, provider) => axios.post('/payments/orders/create_order/', { 
     book_id: bookId, 
-    payment_method: method 
+    provider: provider 
   }),
-  checkOrderStatus: (orderId) => axios.get(`/payments/orders/${orderId}/`),
-  getPaymentHistory: () => axios.get('/payments/history/'),
-  verifyPayment: (params) => axios.post('/payments/verify/', params),
+  getOrders: (params) => axios.get('/payments/orders/', { params }),
+  getOrder: (orderId) => axios.get('/payments/orders/', { params: { id: orderId } }),
+  
+  // VNPay
+  createVNPayCheckout: (orderId) => axios.post('/payments/vnpay/checkout/', { 
+    order_id: orderId 
+  }),
+  
+  // MoMo
+  createMoMoCheckout: (orderId) => axios.post('/payments/momo/checkout/', { 
+    order_id: orderId 
+  }),
 };
 
 export default {
